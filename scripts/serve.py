@@ -7,6 +7,11 @@ import argparse
 
 ROOT = Path(__file__).resolve().parents[1] / 'dist'
 class Handler(SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        # Resolve `/library` to `library.html`, the way static hosts do.
+        local = super().translate_path(path)
+        return local + '.html' if not Path(local).exists() and Path(local + '.html').is_file() else local
+
     def send_error(self, code, message=None, explain=None):
         if code == 404 and (ROOT / '404.html').exists():
             body = (ROOT / '404.html').read_bytes()

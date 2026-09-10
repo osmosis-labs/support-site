@@ -7,6 +7,15 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 VOID = set('area base br col embed hr img input link meta param source track wbr'.split())
 
+def output_path(route):
+    """`/tutorials/x` -> `tutorials/x.html`.
+
+    Static hosts serve that at the extension-less URL directly. Writing
+    `tutorials/x/index.html` instead would make GitHub Pages redirect
+    `/tutorials/x` to `/tutorials/x/`, changing every URL the current site has.
+    """
+    return (route.strip('/') or 'index') + '.html'
+
 class Node:
     def __init__(self, tag='', attrs=(), parent=None):
         self.tag, self.attrs, self.parent, self.children = tag, dict(attrs), parent, []
@@ -42,7 +51,7 @@ class Document(HTMLParser):
 
 
 def main():
-    manifest = json.loads((ROOT / 'source/manifest.json').read_text())
+    manifest = json.loads((ROOT / 'source/manifest.json').read_text(encoding='utf-8'))
     dist = ROOT / 'dist'
     if dist.exists(): shutil.rmtree(dist)
     shutil.copytree(ROOT / 'public', dist)
@@ -50,10 +59,10 @@ def main():
         for remote, local in sorted(manifest['assets'].items(), key=lambda item: -len(item[0])):
             text = text.replace(remote, local).replace(html.escape(remote, quote=True), local)
         return text
-    for css in (dist / 'assets').glob('*.css'): css.write_text(localize(css.read_text()))
-    (dist / 'assets/fonts.css').write_text(localize((ROOT / 'source/fonts.css').read_text()))
+    for css in (dist / 'assets').glob('*.css'): css.write_text(localize(css.read_text(encoding='utf-8')), encoding='utf-8')
+    (dist / 'assets/fonts.css').write_text(localize((ROOT / 'source/fonts.css').read_text(encoding='utf-8')), encoding='utf-8')
     for route, source in manifest['pages'].items():
-        doc = Document(localize((ROOT / source).read_text())); nav_seen = False
+        doc = Document(localize((ROOT / source).read_text(encoding='utf-8'))); nav_seen = False
         for n in list(doc.root.walk()):
             a = n.attrs
             if n.tag == 'script' or (n.tag == 'meta' and a.get('name') == 'generator') or (n.tag == 'link' and (a.get('rel') == 'preconnect' or 'zoom.css' in a.get('href',''))):
@@ -88,9 +97,9 @@ def main():
         head.children.extend(['<link rel="stylesheet" href="/assets/fonts.css">', '<link rel="stylesheet" href="/site.css">', '<script defer src="/site.js"></script>'])
         if not any(n.tag == 'link' and n.attrs.get('rel') == 'canonical' for n in doc.root.walk()):
             head.children.append('<link rel="canonical" href="https://support.osmosis.zone' + route + '">')
-        dest = dist / route.strip('/') / 'index.html'; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_text(doc.root.render())
-    (dist / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join('<url><loc>https://support.osmosis.zone' + html.escape(r) + '</loc></url>' for r in sorted(manifest['pages'])) + '</urlset>\n')
-    (dist / 'robots.txt').write_text('User-agent: *\nAllow: /\nSitemap: https://support.osmosis.zone/sitemap.xml\n')
+        dest = dist / output_path(route); dest.parent.mkdir(parents=True, exist_ok=True); dest.write_text(doc.root.render(), encoding='utf-8')
+    (dist / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join('<url><loc>https://support.osmosis.zone' + html.escape(r) + '</loc></url>' for r in sorted(manifest['pages'])) + '</urlset>\n', encoding='utf-8')
+    (dist / 'robots.txt').write_text('User-agent: *\nAllow: /\nSitemap: https://support.osmosis.zone/sitemap.xml\n', encoding='utf-8')
     print(f"Built {len(manifest['pages'])} pages in dist/ with {len(manifest['assets'])} local assets.")
 
 if __name__ == '__main__': main()

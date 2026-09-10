@@ -3,9 +3,9 @@
 import json, re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from build import Document, ROOT
+from build import Document, ROOT, output_path
 
-manifest = json.loads((ROOT / 'source/manifest.json').read_text())
+manifest = json.loads((ROOT / 'source/manifest.json').read_text(encoding='utf-8'))
 dist = ROOT / 'dist'
 errors = []; checked = 0
 
@@ -15,16 +15,18 @@ def reference(url, base):
     if p.scheme or p.netloc or not p.path: return
     target = dist / unquote(p.path).lstrip('/') if p.path.startswith('/') else base.parent / unquote(p.path)
     checked += 1
-    if not target.is_file() and not (target / 'index.html').is_file(): errors.append(f'{base.relative_to(dist)}: missing {url}')
+    # Pages are written flat, so an extension-less link resolves to `<path>.html`.
+    if not target.is_file() and not (target / 'index.html').is_file() and not Path(str(target) + '.html').is_file():
+        errors.append(f'{base.relative_to(dist)}: missing {url}')
 
 for route, source in manifest['pages'].items():
-    path = dist / route.strip('/') / 'index.html'
+    path = dist / output_path(route)
     if not path.exists(): errors.append('Missing route ' + route); continue
-    text = path.read_text(); doc = Document(text)
+    text = path.read_text(encoding='utf-8'); doc = Document(text)
     nodes = list(doc.root.walk())
     assert sum(n.has_class('w-nav') for n in nodes) == 1, route + ': duplicate navigation'
     assert any(n.tag == 'h1' for n in nodes), route + ': missing heading'
-    original = Document((ROOT / source).read_text())
+    original = Document((ROOT / source).read_text(encoding='utf-8'))
     # The article bodies must survive migration verbatim, apart from asset URLs and link rels.
     def article_text(tree):
         def words(n): return ''.join(words(c) if hasattr(c,'tag') else c for c in n.children)
@@ -41,9 +43,9 @@ for route, source in manifest['pages'].items():
         for url in re.findall(r'url\([\"\']?([^\)\"\']+)', n.attrs.get('style','')): reference(url,path)
     assert not re.search(r'<script[^>]*src="https?://',text), route + ': remote runtime'
 for path in dist.rglob('*.css'):
-    for url in re.findall(r'url\([\"\']?([^\)\"\']+)',path.read_text()):
+    for url in re.findall(r'url\([\"\']?([^\)\"\']+)',path.read_text(encoding='utf-8')):
         if url.startswith('http'): errors.append('External CSS asset ' + url)
         reference(url,path)
-assert 'uco7rjff' in (dist/'site.js').read_text(), 'Missing existing Intercom integration'
+assert 'uco7rjff' in (dist/'site.js').read_text(encoding='utf-8'), 'Missing existing Intercom integration'
 if errors: raise SystemExit('\n'.join(errors))
 print(f'PASS: {len(manifest["pages"])} routes, unchanged tutorial text, {checked} local references, no hosted static dependencies, Intercom configured.')
