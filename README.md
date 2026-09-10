@@ -1,12 +1,12 @@
 # Osmosis Support Lab — static replica
 
-A self-hosted copy of https://support.osmosis.zone, captured September 9, 2026. Includes the homepage, library, all 24 publicly linked tutorials, and 375 local assets. The original CSS, artwork, responsive image variants, fonts, layouts and article text are retained.
+A self-hosted copy of https://support.osmosis.zone, captured September 9, 2026. Includes the homepage, library, all 24 publicly linked tutorials, and 375 local assets. The original CSS, artwork, responsive image variants, fonts, layouts and article text are retained; artwork is re-encoded to WebP at the same dimensions, which is why the repository is around 19 MB rather than 130 MB.
 
 No Webflow account, CMS, database, Node packages, or runtime application server is required. The existing Intercom workspace (`uco7rjff`) is reused. Site content and navigation work without Webflow or Google Fonts requests.
 
 ## Preview
 
-Requires Python 3.10 or newer. No Python packages to install.
+Requires Python 3.10 or newer. Building, serving and verifying need no Python packages; only `scripts/optimize.py` has a dependency. On Windows the interpreter is `python` rather than `python3`.
 
 ```sh
 python3 scripts/build.py
@@ -17,7 +17,14 @@ Open http://127.0.0.1:3000. Alternatively, `npm run dev` runs the same commands.
 
 ## Deploy
 
-Run `python3 scripts/build.py`, then upload **the contents of `dist/`** to any static web host. Preserve the directories: `/library/index.html` and `/tutorials/<slug>/index.html` keep all existing URLs working. Configure directory indexes and serve `404.html` with HTTP status 404 for missing pages. Do not use an SPA catch-all redirect.
+`.github/workflows/deploy.yml` builds and verifies on every push to `main` and publishes `dist/` to GitHub Pages. Pull requests build and verify but do not publish. `public/CNAME` carries the custom domain into the output.
+
+Two things are needed before the first deploy:
+
+- **The repository must be public.** GitHub Pages does not serve private repositories on the `osmosis-labs` plan.
+- **Pages must be set to "GitHub Actions"** as its source in repository settings, with HTTPS enforcement enabled once the certificate provisions.
+
+To deploy anywhere else, run `python3 scripts/build.py` and upload **the contents of `dist/`**. Pages are written flat — `library.html`, `tutorials/<slug>.html` — because static hosts serve those at the extension-less URLs the current site uses. A host that only resolves directory indexes would 404, so it needs an `index.html`-style fallback (`try_files $uri $uri.html` in Nginx). Serve `404.html` with HTTP status 404, and do not use an SPA catch-all redirect.
 
 For an existing Nginx server, use the routing in `nginx.conf`, adjust its document root and hostname, and use your normal HTTPS configuration. A Docker option is included:
 
@@ -28,7 +35,7 @@ docker run --rm -p 8080:80 osmosis-support
 
 The Docker configuration is supplied but was not built in this session. The Python build and local preview were tested.
 
-After deploying and verifying the hosted copy, point `support.osmosis.zone` to that host. Canonical URLs, the sitemap and robots.txt already use that domain. DNS and the existing production site have not been changed.
+After deploying and verifying the hosted copy, point `support.osmosis.zone` to that host — for GitHub Pages, replace the current `CNAME` to `cdn.webflow.com` with one to `osmosis-labs.github.io`. Canonical URLs, the sitemap and robots.txt already use that domain. Leave the Webflow project published for a rollback window. DNS and the existing production site have not been changed.
 
 ## Intercom
 
@@ -49,6 +56,8 @@ Edit source files and rebuild; do not edit generated `dist/` files. To add a tut
 
 `scripts/mirror.py` is the import tool. It reuses downloaded snapshots and assets so an interrupted import can resume. Use `--refresh-pages` to deliberately fetch the published pages again; this overwrites edits to source page snapshots. Normal builds never contact the original site.
 
+`scripts/optimize.py` runs after an import: it re-encodes the downloaded PNGs and JPEGs to WebP, shortens their filenames, and rewrites `source/manifest.json` to match. It is the only script with a third-party dependency (Pillow), it is never part of a normal build, and its output is committed. Run it whenever `mirror.py` has pulled new raster assets, otherwise the repository grows by the original file sizes.
+
 ## Verification and scope
 
 ```sh
@@ -58,6 +67,6 @@ python3 scripts/verify.py
 
 Verification checks all 26 routes, unchanged tutorial body text, over 1,000 local references (including image srcsets and CSS fonts), absence of remote static assets and scripts in generated pages, and the existing Intercom configuration.
 
-The migration replaces Webflow/jQuery/Finsweet JavaScript with local behavior, removes redundant overlapping homepage navigation copies, and fixes duplicate category input IDs. Entrance-animation initial styles are removed so content remains visible without JavaScript. Layout and article content are retained; the current site's analytics snippet is omitted. External destinations such as the Osmosis app, social channels and the existing Tally support request form remain external links.
+The migration replaces Webflow/jQuery/Finsweet JavaScript with local behavior, removes redundant overlapping homepage navigation copies, and fixes duplicate category input IDs. Entrance-animation initial styles are removed so content remains visible without JavaScript. Layout and article content are retained; the site's analytics snippet is dropped and not carried over, so Intercom's widget is the only third-party script the pages load. External destinations such as the Osmosis app, social channels and the existing Tally support request form remain external links.
 
 The source site's `/sitemap.xml` returned 404. Coverage is all pages discovered by recursively following public internal links from the homepage and library; unlinked or unpublished Webflow pages cannot be inventoried without account access.

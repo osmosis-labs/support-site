@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--refresh-pages', action='store_true', help='Overwrite source HTML snapshots with freshly downloaded pages')
     args = parser.parse_args()
     PAGES.mkdir(parents=True, exist_ok=True); ASSETS.mkdir(parents=True, exist_ok=True)
-    manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {'pages': {}, 'assets': {}, 'unavailable_pages': {}}
+    manifest = json.loads(MANIFEST.read_text(encoding='utf-8')) if MANIFEST.exists() else {'pages': {}, 'assets': {}, 'unavailable_pages': {}}
     if args.refresh_pages: manifest['pages'] = {}; manifest['unavailable_pages'] = {}
     queue = {'/', '/library'}; visited = set(); assets = set()
     while queue:
@@ -53,7 +53,7 @@ def main():
                 try: path, file = job.result()
                 except subprocess.CalledProcessError:
                     manifest['unavailable_pages'][path] = 'Source returned an HTTP error'; continue
-                text = file.read_text(); manifest['pages'][path] = str(file.relative_to(ROOT)); assets.update(assets_in(text))
+                text = file.read_text(encoding='utf-8'); manifest['pages'][path] = str(file.relative_to(ROOT)); assets.update(assets_in(text))
                 for link in Links(text).links:
                     parsed = urlsplit(urljoin(ORIGIN + path, link))
                     if parsed.netloc == urlsplit(ORIGIN).netloc and not Path(parsed.path).suffix:
@@ -63,7 +63,7 @@ def main():
     font_url = 'https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap'
     fonts = ROOT / 'source/fonts.css'
     if not fonts.exists(): download(font_url, fonts)
-    assets.update(assets_in(fonts.read_text()))
+    assets.update(assets_in(fonts.read_text(encoding='utf-8')))
     completed = set()
     while assets - completed:
         batch = sorted(assets - completed)
@@ -74,9 +74,9 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             for url, local, dest in pool.map(fetch_asset, batch):
                 completed.add(url); manifest['assets'][url] = local
-                if dest.suffix == '.css': assets.update(assets_in(dest.read_text()))
+                if dest.suffix == '.css': assets.update(assets_in(dest.read_text(encoding='utf-8')))
         print('ASSETS', len(completed), flush=True)
-    MANIFEST.write_text(json.dumps(manifest, indent=2) + '\n')
+    MANIFEST.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     print(f"Saved {len(manifest['pages'])} pages and {len(manifest['assets'])} assets. Unavailable: {manifest['unavailable_pages']}")
 
 if __name__ == '__main__': main()
