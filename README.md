@@ -26,6 +26,10 @@ Two things are needed before the first deploy:
 
 To deploy anywhere else, run `python3 scripts/build.py` and upload **the contents of `dist/`**. Pages are written flat — `library.html`, `tutorials/<slug>.html` — because static hosts serve those at the extension-less URLs the current site uses. A host that only resolves directory indexes would 404, so it needs an `index.html`-style fallback (`try_files $uri $uri.html` in Nginx). Serve `404.html` with HTTP status 404, and do not use an SPA catch-all redirect.
 
+Every internal link and asset reference is relative, so the output works unchanged from a domain root or from a subdirectory — which is what makes the GitHub Pages project URL (`osmosis-labs.github.io/support-site/`) a real preview rather than an unstyled shell. `verify.py` fails the build if a site-absolute reference creeps back in.
+
+`404.html` is the one exception, and deliberately so: it is copied through unprocessed, and a host serves it in place of *any* missing path, so a relative reference in it would resolve against whatever URL the visitor got wrong. Its two references stay site-absolute, which is correct once the site is at a domain root. On a subdirectory preview the 404 page loses its webfont and its Library link — cosmetic, and only there.
+
 For an existing Nginx server, use the routing in `nginx.conf`, adjust its document root and hostname, and use your normal HTTPS configuration. A Docker option is included:
 
 ```sh
