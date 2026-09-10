@@ -1,0 +1,14 @@
+{
+  "name": "osmosis-support-static",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Self-hosted static copy of the Osmosis Support Lab",
+  "scripts": {
+    "build": "python3 scripts/build.py",
+    "dev": "python3 scripts/build.py && python3 scripts/serve.py",
+    "start": "python3 scripts/serve.py",
+    "preview": "python3 scripts/serve.py",
+    "test": "python3 scripts/verify.py",
+    "refresh": "python3 scripts/mirror.py"
+  }
+}
