@@ -4,6 +4,22 @@ A self-hosted copy of https://support.osmosis.zone, captured September 9, 2026. 
 
 No Webflow account, CMS, database, Node packages, or runtime application server is required. The existing Intercom workspace (`uco7rjff`) is reused. Site content and navigation work without Webflow or Google Fonts requests.
 
+## How the site gets built
+
+**The HTML that gets served is not in this repository, and is not meant to be.** What is committed is the input:
+
+| Committed | Generated |
+| --- | --- |
+| `source/pages/` — 26 page snapshots, the editable article and layout HTML | `dist/` — the 26 built pages actually served |
+| `source/manifest.json` — routes, and remote-URL to local-asset mappings | |
+| `public/` — assets, `site.js`, `site.css`, `404.html`, `CNAME`, copied through as-is | |
+
+`scripts/build.py` turns the first column into the second. `dist/` is in `.gitignore` and is never committed, so generated output cannot drift from its source. Run the build and it appears locally; delete it and nothing is lost.
+
+There is no `gh-pages` branch either. Because Pages is sourced from GitHub Actions rather than from a branch, the workflow builds `dist/` in CI, uploads it as an artifact, and serves that artifact directly — so no built HTML exists anywhere in git history.
+
+To look at the built site without deploying, either run the preview below, or open the `github-pages` artifact attached to any completed workflow run.
+
 ## Preview
 
 Requires Python 3.10 or newer. Building, serving and verifying need no Python packages; only `scripts/optimize.py` has a dependency. On Windows the interpreter is `python` rather than `python3`.
@@ -17,12 +33,14 @@ Open http://127.0.0.1:3000. Alternatively, `npm run dev` runs the same commands.
 
 ## Deploy
 
-`.github/workflows/deploy.yml` builds and verifies on every push to `main` and publishes `dist/` to GitHub Pages. Pull requests build and verify but do not publish. `public/CNAME` carries the custom domain into the output.
+`.github/workflows/deploy.yml` builds and verifies on every push to `main` and publishes `dist/` to GitHub Pages. Pull requests build and verify but do not publish, so merging to `main` is what makes a change live. `public/CNAME` carries the custom domain into the output.
 
-Two things are needed before the first deploy:
+Getting the first deploy out, in order:
 
-- **The repository must be public.** GitHub Pages does not serve private repositories on the `osmosis-labs` plan.
-- **Pages must be set to "GitHub Actions"** as its source in repository settings, with HTTPS enforcement enabled once the certificate provisions.
+1. **Make the repository public.** GitHub Pages does not serve private repositories on the `osmosis-labs` plan. This needs **Admin** on the repository — Maintain is not enough.
+2. **Set Pages to build from GitHub Actions** in Settings → Pages. This one only needs **Maintain**.
+3. **Merge to `main`.** The deploy job stops skipping and publishes to `osmosis-labs.github.io/support-site`.
+4. **Enable HTTPS enforcement** once the certificate provisions, then check the site before touching DNS.
 
 To deploy anywhere else, run `python3 scripts/build.py` and upload **the contents of `dist/`**. Pages are written flat — `library.html`, `tutorials/<slug>.html` — because static hosts serve those at the extension-less URLs the current site uses. A host that only resolves directory indexes would 404, so it needs an `index.html`-style fallback (`try_files $uri $uri.html` in Nginx). Serve `404.html` with HTTP status 404, and do not use an SPA catch-all redirect.
 
