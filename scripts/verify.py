@@ -42,6 +42,9 @@ for route, source in manifest['pages'].items():
             if item.strip(): reference(item.strip().split()[0],path)
         for url in re.findall(r'url\([\"\']?([^\)\"\']+)', n.attrs.get('style','')): reference(url,path)
     assert not re.search(r'<script[^>]*src="https?://',text), route + ': remote runtime'
+    # Links must be relative, or the site breaks when served from a subdirectory.
+    rooted = re.findall(r'(?:href|src)="(/(?!/)[^"]*)"', text)
+    assert not rooted, f'{route}: site-absolute reference {rooted[0]}'
 for path in dist.rglob('*.css'):
     for url in re.findall(r'url\([\"\']?([^\)\"\']+)',path.read_text(encoding='utf-8')):
         if url.startswith('http'): errors.append('External CSS asset ' + url)

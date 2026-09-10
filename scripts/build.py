@@ -16,6 +16,29 @@ def output_path(route):
     """
     return (route.strip('/') or 'index') + '.html'
 
+def relativize(url, rel):
+    """Rewrite a site-absolute URL against a page `rel` levels below the root.
+
+    Keeps the output working when it is served from a subdirectory instead of a
+    domain root — a GitHub Pages project site, say, which is how this gets
+    reviewed before DNS moves. Absolute and protocol-relative URLs, anchors and
+    `mailto:` are left alone.
+    """
+    if not url.startswith('/') or url.startswith('//'): return url
+    return (rel + url.lstrip('/')) or './'
+
+def relativize_page(doc, rel):
+    for n in doc.root.walk():
+        a = n.attrs
+        for key in ('href', 'src', 'poster'):
+            if isinstance(a.get(key), str): a[key] = relativize(a[key], rel)
+        if a.get('srcset'):
+            parts = [p.split() for p in a['srcset'].split(',') if p.strip()]
+            a['srcset'] = ', '.join(' '.join([relativize(p[0], rel)] + p[1:]) for p in parts)
+        if 'url(' in a.get('style', ''):
+            a['style'] = re.sub(r'url\((["\']?)(/[^)"\']+)\1\)',
+                                lambda m: f'url({m[1]}{relativize(m[2], rel)}{m[1]})', a['style'])
+
 class Node:
     def __init__(self, tag='', attrs=(), parent=None):
         self.tag, self.attrs, self.parent, self.children = tag, dict(attrs), parent, []
@@ -59,8 +82,11 @@ def main():
         for remote, local in sorted(manifest['assets'].items(), key=lambda item: -len(item[0])):
             text = text.replace(remote, local).replace(html.escape(remote, quote=True), local)
         return text
-    for css in (dist / 'assets').glob('*.css'): css.write_text(localize(css.read_text(encoding='utf-8')), encoding='utf-8')
-    (dist / 'assets/fonts.css').write_text(localize((ROOT / 'source/fonts.css').read_text(encoding='utf-8')), encoding='utf-8')
+    # These stylesheets sit in the same directory as the assets they reference,
+    # so dropping the leading /assets/ makes them subdirectory-safe too.
+    def localize_css(text): return re.sub(r'url\((["\']?)/assets/', r'url(\1', localize(text))
+    for css in (dist / 'assets').glob('*.css'): css.write_text(localize_css(css.read_text(encoding='utf-8')), encoding='utf-8')
+    (dist / 'assets/fonts.css').write_text(localize_css((ROOT / 'source/fonts.css').read_text(encoding='utf-8')), encoding='utf-8')
     for route, source in manifest['pages'].items():
         doc = Document(localize((ROOT / source).read_text(encoding='utf-8'))); nav_seen = False
         for n in list(doc.root.walk()):
@@ -93,8 +119,10 @@ def main():
             if a.get('fs-cmsfilter-element') == 'results-count': n.children = ['24']
             if a.get('fs-cmsfilter-element') == 'empty': a['hidden'] = None
             if a.get('id') == 'year': n.children = [str(datetime.date.today().year)]
+        rel = '../' * route.strip('/').count('/')
+        relativize_page(doc, rel)
         head = next(n for n in doc.root.walk() if n.tag == 'head')
-        head.children.extend(['<link rel="stylesheet" href="/assets/fonts.css">', '<link rel="stylesheet" href="/site.css">', '<script defer src="/site.js"></script>'])
+        head.children.extend([f'<link rel="stylesheet" href="{rel}assets/fonts.css">', f'<link rel="stylesheet" href="{rel}site.css">', f'<script defer src="{rel}site.js"></script>'])
         if not any(n.tag == 'link' and n.attrs.get('rel') == 'canonical' for n in doc.root.walk()):
             head.children.append('<link rel="canonical" href="https://support.osmosis.zone' + route + '">')
         dest = dist / output_path(route); dest.parent.mkdir(parents=True, exist_ok=True); dest.write_text(doc.root.render(), encoding='utf-8')
