@@ -9,6 +9,7 @@
     "start": "python3 scripts/serve.py",
     "preview": "python3 scripts/serve.py",
     "test": "python3 scripts/verify.py",
-    "refresh": "python3 scripts/mirror.py"
+    "refresh": "python3 scripts/mirror.py",
+    "optimize": "python3 scripts/optimize.py"
   }
 }
