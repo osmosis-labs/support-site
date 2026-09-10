@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from build import Document, ROOT
 
-manifest = json.loads((ROOT / 'source/manifest.json').read_text())
+manifest = json.loads((ROOT / 'source/manifest.json').read_text(encoding='utf-8'))
 dist = ROOT / 'dist'
 errors = []; checked = 0
 
@@ -20,11 +20,11 @@ def reference(url, base):
 for route, source in manifest['pages'].items():
     path = dist / route.strip('/') / 'index.html'
     if not path.exists(): errors.append('Missing route ' + route); continue
-    text = path.read_text(); doc = Document(text)
+    text = path.read_text(encoding='utf-8'); doc = Document(text)
     nodes = list(doc.root.walk())
     assert sum(n.has_class('w-nav') for n in nodes) == 1, route + ': duplicate navigation'
     assert any(n.tag == 'h1' for n in nodes), route + ': missing heading'
-    original = Document((ROOT / source).read_text())
+    original = Document((ROOT / source).read_text(encoding='utf-8'))
     # The article bodies must survive migration verbatim, apart from asset URLs and link rels.
     def article_text(tree):
         def words(n): return ''.join(words(c) if hasattr(c,'tag') else c for c in n.children)
@@ -41,9 +41,9 @@ for route, source in manifest['pages'].items():
         for url in re.findall(r'url\([\"\']?([^\)\"\']+)', n.attrs.get('style','')): reference(url,path)
     assert not re.search(r'<script[^>]*src="https?://',text), route + ': remote runtime'
 for path in dist.rglob('*.css'):
-    for url in re.findall(r'url\([\"\']?([^\)\"\']+)',path.read_text()):
+    for url in re.findall(r'url\([\"\']?([^\)\"\']+)',path.read_text(encoding='utf-8')):
         if url.startswith('http'): errors.append('External CSS asset ' + url)
         reference(url,path)
-assert 'uco7rjff' in (dist/'site.js').read_text(), 'Missing existing Intercom integration'
+assert 'uco7rjff' in (dist/'site.js').read_text(encoding='utf-8'), 'Missing existing Intercom integration'
 if errors: raise SystemExit('\n'.join(errors))
 print(f'PASS: {len(manifest["pages"])} routes, unchanged tutorial text, {checked} local references, no hosted static dependencies, Intercom configured.')
