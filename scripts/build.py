@@ -7,6 +7,15 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 VOID = set('area base br col embed hr img input link meta param source track wbr'.split())
 
+def output_path(route):
+    """`/tutorials/x` -> `tutorials/x.html`.
+
+    Static hosts serve that at the extension-less URL directly. Writing
+    `tutorials/x/index.html` instead would make GitHub Pages redirect
+    `/tutorials/x` to `/tutorials/x/`, changing every URL the current site has.
+    """
+    return (route.strip('/') or 'index') + '.html'
+
 class Node:
     def __init__(self, tag='', attrs=(), parent=None):
         self.tag, self.attrs, self.parent, self.children = tag, dict(attrs), parent, []
@@ -88,7 +97,7 @@ def main():
         head.children.extend(['<link rel="stylesheet" href="/assets/fonts.css">', '<link rel="stylesheet" href="/site.css">', '<script defer src="/site.js"></script>'])
         if not any(n.tag == 'link' and n.attrs.get('rel') == 'canonical' for n in doc.root.walk()):
             head.children.append('<link rel="canonical" href="https://support.osmosis.zone' + route + '">')
-        dest = dist / route.strip('/') / 'index.html'; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_text(doc.root.render(), encoding='utf-8')
+        dest = dist / output_path(route); dest.parent.mkdir(parents=True, exist_ok=True); dest.write_text(doc.root.render(), encoding='utf-8')
     (dist / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join('<url><loc>https://support.osmosis.zone' + html.escape(r) + '</loc></url>' for r in sorted(manifest['pages'])) + '</urlset>\n', encoding='utf-8')
     (dist / 'robots.txt').write_text('User-agent: *\nAllow: /\nSitemap: https://support.osmosis.zone/sitemap.xml\n', encoding='utf-8')
     print(f"Built {len(manifest['pages'])} pages in dist/ with {len(manifest['assets'])} local assets.")

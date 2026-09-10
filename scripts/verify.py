@@ -3,7 +3,7 @@
 import json, re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from build import Document, ROOT
+from build import Document, ROOT, output_path
 
 manifest = json.loads((ROOT / 'source/manifest.json').read_text(encoding='utf-8'))
 dist = ROOT / 'dist'
@@ -15,10 +15,12 @@ def reference(url, base):
     if p.scheme or p.netloc or not p.path: return
     target = dist / unquote(p.path).lstrip('/') if p.path.startswith('/') else base.parent / unquote(p.path)
     checked += 1
-    if not target.is_file() and not (target / 'index.html').is_file(): errors.append(f'{base.relative_to(dist)}: missing {url}')
+    # Pages are written flat, so an extension-less link resolves to `<path>.html`.
+    if not target.is_file() and not (target / 'index.html').is_file() and not Path(str(target) + '.html').is_file():
+        errors.append(f'{base.relative_to(dist)}: missing {url}')
 
 for route, source in manifest['pages'].items():
-    path = dist / route.strip('/') / 'index.html'
+    path = dist / output_path(route)
     if not path.exists(): errors.append('Missing route ' + route); continue
     text = path.read_text(encoding='utf-8'); doc = Document(text)
     nodes = list(doc.root.walk())
